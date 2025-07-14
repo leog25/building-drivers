@@ -1,0 +1,188 @@
+================================================================================
+                         SAMPLE SPI TRANSFER LOG
+================================================================================
+
+This demonstrates typical SPI transfer logs captured during device driver 
+development. The format shows:
+- Timestamp range (in microseconds)
+- MOSI transfers (Master Out, Slave In - what MCU sends)
+- Detailed explanation of each operation
+
+================================================================================
+HOW TO CAPTURE SPI TRANSFER DATA
+================================================================================
+
+You can capture this data using several tools:
+
+Raw SPI data can be captured using logical analyze tools and software like Pulseview and Saleae Logic. Without any context, trying to find patterns in the SPI transfer and then referring that with the datasheet. 
+
+================================================================================
+SAMPLE SPI TRANSFER LOG - SENSOR INITIALIZATION
+================================================================================
+
+--------------------------------------------------------------------------------
+POWER-ON SEQUENCE
+--------------------------------------------------------------------------------
+
+1234567-1234650   SPI: MOSI transfers: FF                      ; Software Reset - Opcode 0xFF. Resets all registers to default values.
+
+1235890-1236045   SPI: MOSI transfers: 84 00                   ; Read Status Register (0x04) - Opcode 0x84 (0x80|0x04). Checking if device is ready after reset.
+
+1236300-1236455   SPI: MOSI transfers: 80 00                   ; Read Device ID (0x00) - Opcode 0x80 (0x80|0x00). Verifying device identity.
+
+1236700-1236855   SPI: MOSI transfers: 81 00                   ; Read Version Register (0x01) - Opcode 0x81 (0x80|0x01). Checking firmware version.
+
+--------------------------------------------------------------------------------
+DEVICE CONFIGURATION
+--------------------------------------------------------------------------------
+
+1237200-1237355   SPI: MOSI transfers: 02 81                   ; Write Config Register (0x02, 0x81) - Enable device with 4G range. CONFIG_ENABLE | CONFIG_RANGE_4G.
+
+1237600-1237755   SPI: MOSI transfers: 03 0A                   ; Write Mode Register (0x03, 0x0A) - Set active mode with 12-bit resolution. MODE_ACTIVE | MODE_RESOLUTION_12BIT.
+
+1238000-1238155   SPI: MOSI transfers: 08 04                   ; Write Data Rate Register (0x08, 0x04) - Set 100Hz sampling rate. DATA_RATE_100HZ.
+
+1238400-1238555   SPI: MOSI transfers: 05 81                   ; Write Interrupt Register (0x05, 0x81) - Enable data ready interrupt. INT_DATA_READY_EN | INT_ENABLE.
+
+1238800-1238955   SPI: MOSI transfers: 0E 00                   ; Write Power Management (0x0E, 0x00) - Set normal power mode. POWER_CLKSEL_INTERNAL.
+
+--------------------------------------------------------------------------------
+FIFO CONFIGURATION
+--------------------------------------------------------------------------------
+
+1239300-1239455   SPI: MOSI transfers: 06 05                   ; Write FIFO Config (0x06, 0x05) - Set FIFO mode with threshold 1. FIFO_MODE_FIFO | (1 << 2).
+
+1239700-1239855   SPI: MOSI transfers: 87 00                   ; Read FIFO Status (0x07) - Opcode 0x87 (0x80|0x07). Checking FIFO empty status.
+
+--------------------------------------------------------------------------------
+CALIBRATION SEQUENCE
+--------------------------------------------------------------------------------
+
+1240200-1240355   SPI: MOSI transfers: 0C 01                   ; Write Calibration Register (0x0C, 0x01) - Start calibration sequence.
+
+1245000-1245155   SPI: MOSI transfers: 8C 00                   ; Read Calibration Register (0x0C) - Opcode 0x8C (0x80|0x0C). Checking calibration status.
+
+1245400-1245555   SPI: MOSI transfers: 84 00                   ; Read Status Register (0x04) - Checking if calibration complete.
+
+--------------------------------------------------------------------------------
+FIRST DATA READING
+--------------------------------------------------------------------------------
+
+1250000-1250155   SPI: MOSI transfers: 84 00                   ; Read Status Register (0x04) - Checking for data ready flag.
+
+1250400-1251000   SPI: MOSI transfers: D0 00 00 00 00 00 00    ; Burst Read from 0x10 - Opcode 0xD0 (0xC0|0x10). Reading X, Y, Z axis data (6 bytes).
+
+1251300-1251455   SPI: MOSI transfers: 96 00                   ; Read Temperature (0x16) - Opcode 0x96 (0x80|0x16). Reading temperature sensor.
+
+--------------------------------------------------------------------------------
+CONTINUOUS OPERATION
+--------------------------------------------------------------------------------
+
+1252000-1252155   SPI: MOSI transfers: 84 00                   ; Read Status - Polling for new data.
+
+1252400-1253000   SPI: MOSI transfers: D0 00 00 00 00 00 00    ; Burst Read X,Y,Z data - Reading next sample.
+
+1253300-1253455   SPI: MOSI transfers: 87 00                   ; Read FIFO Status - Checking FIFO level.
+
+1253700-1254200   SPI: MOSI transfers: 3F 00 00 00 00 00       ; Read FIFO Data - Opcode 0x3F. Reading 5 bytes from FIFO buffer.
+
+--------------------------------------------------------------------------------
+THRESHOLD MONITORING
+--------------------------------------------------------------------------------
+
+1255000-1255155   SPI: MOSI transfers: 0A 7F                   ; Write High Threshold (0x0A, 0x7F) - Set high threshold to 127 (about 1g in 8-bit mode).
+
+1255400-1255555   SPI: MOSI transfers: 0B 80                   ; Write Low Threshold (0x0B, 0x80) - Set low threshold to -128 (about -1g in 8-bit mode).
+
+1255800-1255955   SPI: MOSI transfers: 05 B1                   ; Update Interrupt Config (0x05, 0xB1) - Enable threshold interrupts. INT_THRESHOLD_HIGH_EN | INT_THRESHOLD_LOW_EN | INT_DATA_READY_EN | INT_ENABLE.
+
+--------------------------------------------------------------------------------
+ERROR HANDLING
+--------------------------------------------------------------------------------
+
+1260000-1260155   SPI: MOSI transfers: 84 00                   ; Read Status - Checking for error conditions.
+
+1260400-1260555   SPI: MOSI transfers: 0D 20                   ; Write Test Mode (0x0D, 0x20) - Enable self-test mode.
+
+1265000-1265155   SPI: MOSI transfers: 84 00                   ; Read Status - Checking self-test results.
+
+1265400-1265555   SPI: MOSI transfers: 0D 00                   ; Write Test Mode (0x0D, 0x00) - Disable self-test mode.
+
+--------------------------------------------------------------------------------
+POWER DOWN SEQUENCE
+--------------------------------------------------------------------------------
+
+1270000-1270155   SPI: MOSI transfers: 05 00                   ; Write Interrupt Register (0x05, 0x00) - Disable all interrupts.
+
+1270400-1270555   SPI: MOSI transfers: 03 00                   ; Write Mode Register (0x03, 0x00) - Set power down mode. MODE_POWER_DOWN.
+
+1270800-1270955   SPI: MOSI transfers: 0E 40                   ; Write Power Management (0x0E, 0x40) - Set standby mode. POWER_STANDBY.
+
+================================================================================
+ANALYSIS PATTERNS
+================================================================================
+
+**Common Patterns Observed:**
+1. **Status Polling**: Regular 0x84 0x00 reads to check device state
+2. **Burst Reads**: 0xD0 for efficient multi-byte data acquisition
+3. **Configuration Writes**: Sequential register writes during initialization
+4. **FIFO Operations**: 0x3F reads and 0x40 writes for buffered data
+5. **Error Recovery**: Test mode and reset sequences
+
+**Timing Characteristics:**
+- Individual register operations: ~155µs
+- Burst reads (6 bytes): ~600µs  
+- Configuration sequence: ~5ms total
+- Continuous sampling: 10ms intervals (100Hz)
+
+**Debug Insights:**
+- Commands always start with register address
+- Read commands have 0x80 bit set
+- Write commands send data immediately after address
+- FIFO operations use special opcodes (0x3F, 0x40)
+- Status register is most frequently accessed
+
+================================================================================
+CAPTURING YOUR OWN DATA
+================================================================================
+
+**Step 1: Set up Logic Analyzer**
+```
+Connect:
+- Channel 0 → SPI CLK
+- Channel 1 → SPI MOSI  
+- Channel 2 → SPI MISO
+- Channel 3 → SPI CS (Chip Select)
+```
+
+**Step 2: Configure Capture**
+```
+Sample Rate: 10MHz (10x faster than SPI clock)
+Trigger: Falling edge on CS
+Duration: 10 seconds
+Protocol: SPI decoder enabled
+```
+
+**Step 3: Start Your Device**
+```
+Power on your device
+Run your Arduino/driver code
+Watch the decoded SPI data appear
+```
+
+**Step 4: Export and Analyze**
+```
+Export to CSV or text format
+Look for patterns in command sequences
+Verify against your register definitions
+Document timing requirements
+```
+
+This type of capture is invaluable for:
+- Debugging communication issues
+- Verifying driver behavior
+- Understanding device timing requirements
+- Reverse engineering unknown protocols
+- Optimizing transfer efficiency
+
+================================================================================ 
