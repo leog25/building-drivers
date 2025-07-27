@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code Viewer - Building Device Drivers</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <pre class="ascii-art-small">
+ _____ ____  ____  _____   _     _ _____ _____  _    _ _____ ______ 
+/  __ \  _  ||  _ \|  ___| | |   | |_   _|  ___|| |  | |  ___|| ___ \
+| /  \/ | | || | | | |__   | |   | | | | | |__  | |  | | |__  | |_/ /
+| |   | | | || | | |  __|  | |   | | | | |  __| | |/\| |  __| |    / 
+| \__/\ \_/ || |_| | |___  \ \_/ / _ | |_| |___ \  /\  / |___ | |\ \ 
+ \____/\___/ |____/\____/   \___/  \___/\_____/  \/  \/\____/ \_| \_|
+        </pre>
+        <nav>
+            <a href="index.html" class="back-link">[← Back to Main]</a>
+        </nav>
+    </header>
+
+    <main>
+        <div id="file-selector" class="terminal-box">
+            <h2>[Select File to View]</h2>
+            <select id="file-dropdown">
+                <option value="">-- Select a file --</option>
+                <option value="spi_hal.h">spi_hal.h - Hardware Abstraction Layer Interface</option>
+                <option value="spi_device_driver.h">spi_device_driver.h - Device Driver Interface</option>
+                <option value="spi_device_driver.c">spi_device_driver.c - Device Driver Implementation</option>
+                <option value="spi_hal_linux.c">spi_hal_linux.c - Linux Platform Implementation</option>
+                <option value="registers.h">registers.h - Device Register Definitions</option>
+                <option value="spi_data.txt">spi_data.txt - Sample SPI Transfer Data</option>
+            </select>
+        </div>
+
+        <div id="code-display" class="terminal-box" style="display: none;">
+            <div class="code-header">
+                <h2 id="filename">[Filename]</h2>
+                <button id="copy-button" class="copy-btn">[Copy Code]</button>
+            </div>
+            <pre id="code-content" class="code-viewer"></pre>
+        </div>
+    </main>
+
+    <footer>
+        <p>Code Viewer - Building Device Drivers From The Ground Up</p>
+    </footer>
+
+    <script>
+        const fileContents = {
+            'spi_hal.h': `File not loaded - This would normally load from the server`,
+            'spi_device_driver.h': `File not loaded - This would normally load from the server`,
+            'spi_device_driver.c': `File not loaded - This would normally load from the server`,
+            'spi_hal_linux.c': `File not loaded - This would normally load from the server`,
+            'registers.h': `File not loaded - This would normally load from the server`,
+            'spi_data.txt': `File not loaded - This would normally load from the server`
+        };
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const fileParam = urlParams.get('file');
+
+        const fileDropdown = document.getElementById('file-dropdown');
+        const codeDisplay = document.getElementById('code-display');
+        const codeContent = document.getElementById('code-content');
+        const filenameDisplay = document.getElementById('filename');
+        const copyButton = document.getElementById('copy-button');
+
+        if (fileParam && fileDropdown.querySelector(`option[value="${fileParam}"]`)) {
+            fileDropdown.value = fileParam;
+            loadFile(fileParam);
+        }
+
+        fileDropdown.addEventListener('change', function() {
+            const selectedFile = this.value;
+            if (selectedFile) {
+                const newUrl = `${window.location.pathname}?file=${selectedFile}`;
+                window.history.pushState({}, '', newUrl);
+                loadFile(selectedFile);
+            } else {
+                codeDisplay.style.display = 'none';
+            }
+        });
+
+        function loadFile(filename) {
+            filenameDisplay.textContent = `[${filename}]`;
+            
+            fetch(filename)
+                .then(response => response.text())
+                .then(text => {
+                    codeContent.textContent = text;
+                    codeDisplay.style.display = 'block';
+                    
+                    addLineNumbers();
+                })
+                .catch(error => {
+                    codeContent.textContent = `Error loading file: ${filename}\n\nIn a production environment, this would load the actual file content.`;
+                    codeDisplay.style.display = 'block';
+                });
+        }
+
+        function addLineNumbers() {
+            const lines = codeContent.textContent.split('\n');
+            const numberedLines = lines.map((line, index) => {
+                const lineNum = (index + 1).toString().padStart(4, ' ');
+                return `${lineNum}│ ${line}`;
+            });
+            codeContent.textContent = numberedLines.join('\n');
+        }
+
+        copyButton.addEventListener('click', function() {
+            const textToCopy = codeContent.textContent;
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                this.textContent = '[Copied!]';
+                setTimeout(() => {
+                    this.textContent = '[Copy Code]';
+                }, 2000);
+            });
+        });
+    </script>
+</body>
+</html>

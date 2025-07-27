@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Building Device Drivers From The Ground Up</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <pre class="ascii-art">
+    ____        _ __    ___                ____       _                     
+   / __ )__  __(_) /___/ (_)___  ____ _   / __ \_____(_)   _____  __________
+  / __  / / / / / / __  / / __ \/ __ `/  / / / / ___/ / | / / _ \/ ___/ ___/
+ / /_/ / /_/ / / / /_/ / / / / / /_/ /  / /_/ / /  / /| |/ /  __/ /  (__  ) 
+/_____/\__,_/_/_/\__,_/_/_/ /_/\__, /  /_____/_/  /_/ |___/\___/_/  /____/  
+                               /____/                                         
+        </pre>
+        <nav>
+            <ul>
+                <li><a href="#introduction">Introduction</a></li>
+                <li><a href="#lego-castle">Lego Castle</a></li>
+                <li><a href="#zephyr">Zephyr RTOS</a></li>
+                <li><a href="#arduino">Arduino</a></li>
+                <li><a href="#datasheet">Datasheet</a></li>
+                <li><a href="#spi">SPI Communication</a></li>
+                <li><a href="#interrupts">Interrupts</a></li>
+                <li><a href="#hal">Building HAL</a></li>
+                <li><a href="#code">View Code</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <section id="introduction" class="content-section">
+            <h2>[Introduction]</h2>
+            <div class="terminal-box">
+                <p>The purpose of this document is to lay out how one may approach building a device driver from the ground up. With the onset of AI tools and agentic workflows, many of the brilliant architecture of systems under the hood is abstracted away. But human curiosity will always persist. When given a black box, where an input results in some output, it is human nature to be curious of the inner workings of the box. This is the same when working with embedded systems.</p>
+                
+                <blockquote class="insight">
+                    <strong>&gt; Key Insight:</strong> Understanding the inner workings of embedded systems satisfies our natural curiosity and makes us better developers.
+                </blockquote>
+            </div>
+        </section>
+
+        <section id="lego-castle" class="content-section">
+            <h2>[The Lego Castle Analogy]</h2>
+            <div class="terminal-box">
+                <p>The key part of firmware development is the idea of <strong>abstraction</strong>. When you create simplicity from complexity. Say you wanted to build a Lego castle, the reality is it'll be much more complex to personally create injection molds, find the right plastic formula, and etc. But if you break it down into repeatable steps and into "Lego bricks" that enables anybody to build a Lego Castle of their own, a daunting task, becomes much more simplistic.</p>
+                
+                <p>This is essentially the key idea of building a device driver from the ground up. The <strong>hardware abstraction layer (HAL)</strong> acts like the Lego brick interface. It hides the intricate details of registers, timing, and protocols of the underlying hardware and exposes a consistent, simplified API for higher-level code to interact with.</p>
+            </div>
+        </section>
+
+        <section id="zephyr" class="content-section">
+            <h2>[Approaching Zephyr RTOS]</h2>
+            <div class="terminal-box">
+                <p>Learning and working with Zephyr is quite a learning curve. For starters, Nordic has beginner and intermediate free courses on using Zephyr RTOS with their NRF Connect SDK:</p>
+                
+                <pre class="code-snippet">
+$ https://academy.nordicsemi.com/
+                </pre>
+                
+                <p>Though it is through NRF Connect, they do establish a good foundation for how to use Zephyr's device tree and KConfig system. Honestly, don't spend too much time trying to learn it. Much of what you learn will be through doing. You will naturally learn and inevitably stumble upon many niche and obscure features of Zephyr.</p>
+            </div>
+        </section>
+
+        <section id="arduino" class="content-section">
+            <h2>[Know Arduino]</h2>
+            <div class="terminal-box">
+                <p>Arduino is a good tool to help you build out the barebone functionality of your driver. It's easy to set up and use. <strong>Trust me. Use Arduino.</strong> This is a lesson a wise man taught me.</p>
+                
+                <h3>Arduino to Zephyr Workflow:</h3>
+                <ol class="workflow-list">
+                    <li><strong>Prototype</strong> in Arduino to understand the hardware</li>
+                    <li><strong>Test</strong> basic SPI communication and device responses</li>
+                    <li><strong>Document</strong> working code sequences and timing requirements</li>
+                    <li><strong>Wrap</strong> basic SPI transfers into reusable functions</li>
+                    <li><strong>Translate</strong> proven Arduino code patterns to Zephyr driver format</li>
+                </ol>
+            </div>
+        </section>
+
+        <section id="datasheet" class="content-section">
+            <h2>[Datasheet]</h2>
+            <div class="terminal-box">
+                <p>Find the datasheet for the device you are trying to build a driver for. This will serve as your <strong>source of truth</strong> and most answers to your problems can be derived from the datasheet. You can read through it, skim it, or whatever, but most importantly, upload it to Gemini or LLM of choice (depending on the context window). Ta da! Your datasheet is now a conversational tool to help you through this journey.</p>
+            </div>
+        </section>
+
+        <section id="spi" class="content-section">
+            <h2>[Understanding SPI Communication]</h2>
+            <div class="terminal-box">
+                <h3>SPI Basics</h3>
+                <p>SPI is a <strong>synchronous</strong>, <strong>full-duplex</strong> communication protocol that uses a <strong>master-slave</strong> architecture:</p>
+                
+                <ul>
+                    <li><strong>Master:</strong> Controls the communication (usually your microcontroller)</li>
+                    <li><strong>Slave:</strong> Responds to master's requests (your sensor/device)</li>
+                    <li><strong>Synchronous:</strong> Data transfer is synchronized by a clock signal</li>
+                    <li><strong>Full-duplex:</strong> Data can flow in both directions simultaneously</li>
+                </ul>
+
+                <h3>SPI Signal Lines</h3>
+                <pre class="ascii-diagram">
+    +--------+                        +--------+
+    | Master |      SCLK  --------->  | Slave  |
+    |  MCU   |      MOSI  --------->  | Device |
+    |        |      MISO  <---------  |        |
+    |        |      CS    --------->  |        |
+    +--------+                        +--------+
+                </pre>
+
+                <ol>
+                    <li><strong>SCLK (Serial Clock):</strong> Master generates clock pulses to synchronize data transfer</li>
+                    <li><strong>MOSI (Master Out, Slave In):</strong> Data line from master to slave</li>
+                    <li><strong>MISO (Master In, Slave Out):</strong> Data line from slave to master</li>
+                    <li><strong>CS/SS (Chip Select/Slave Select):</strong> Master selects which slave to communicate with</li>
+                </ol>
+
+                <h3>Example Transfer Sequence</h3>
+                <pre class="code-snippet">
+Master wants to read device ID from register 0x00:
+
+Transfer 1: Send command
+TX: 0x80  (Read command for register 0x00)
+RX: 0xFF  (Slave sends dummy data while processing command)
+
+Transfer 2: Read the actual data  
+TX: 0x00  (Master sends dummy byte to generate clock)
+RX: 0x42  (Slave responds with device ID)
+                </pre>
+            </div>
+        </section>
+
+        <section id="interrupts" class="content-section">
+            <h2>[Understanding Interrupts]</h2>
+            <div class="terminal-box">
+                <p>Interrupts are one of the most powerful features in embedded systems, but they can seem intimidating at first. Think of interrupts like a doorbell - instead of constantly checking if someone is at the door, you wait for the bell to ring and then respond.</p>
+
+                <h3>Why Interrupts Matter</h3>
+                <p>Without interrupts, your microcontroller would spend most of its time <strong>polling</strong> - constantly asking "Is the sensor ready? Is the sensor ready?" This wastes CPU cycles and drains battery power. With interrupts, the sensor says "Hey, I'm ready!" and your microcontroller can do other useful work in the meantime.</p>
+
+                <h3>Interrupt Handler Pattern</h3>
+                <pre class="code-snippet">
+void sensor_interrupt_handler(void)
+{
+    // 1. Read status register to see what happened
+    uint8_t status = read_sensor_status();
+    
+    // 2. Handle different interrupt sources
+    if (status & DATA_READY_FLAG) {
+        // Data is ready - read it
+        sensor_data_t data;
+        read_sensor_data(&data);
+        
+        // Process or queue the data
+        add_to_data_queue(&data);
+    }
+    
+    if (status & THRESHOLD_FLAG) {
+        // Threshold exceeded - take action
+        handle_threshold_event();
+    }
+    
+    // 3. Clear interrupt flags
+    clear_interrupt_flags(status);
+}
+                </pre>
+
+                <h3>Interrupt Best Practices</h3>
+                <div class="best-practices">
+                    <p><strong>Keep It Short and Sweet</strong></p>
+                    <ul>
+                        <li>Interrupt handlers should be <strong>fast</strong> - do minimal work</li>
+                        <li>Read the data, set a flag, exit quickly</li>
+                        <li>Do heavy processing in your main loop</li>
+                    </ul>
+                    
+                    <p><strong>Don't Block in Interrupts</strong></p>
+                    <ul>
+                        <li>No <code>delay()</code> or long calculations</li>
+                        <li>No <code>printf()</code> or serial communication</li>
+                        <li>No complex algorithms</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <section id="hal" class="content-section">
+            <h2>[Building Your HAL]</h2>
+            <div class="terminal-box">
+                <h3>The HAL Philosophy</h3>
+                <p>A good HAL should be like a <strong>good restaurant menu</strong>:</p>
+                <ul>
+                    <li><strong>Simple choices</strong> - Clear function names that explain what they do</li>
+                    <li><strong>Hide complexity</strong> - You don't need to know how the kitchen works</li>
+                    <li><strong>Consistent interface</strong> - Similar functions work in similar ways</li>
+                    <li><strong>Error handling</strong> - Graceful failure when something goes wrong</li>
+                </ul>
+
+                <h3>HAL Architecture Layers</h3>
+                <pre class="ascii-diagram">
+┌─────────────────────────────────────┐
+│     Application Code                │  ← Your main program
+├─────────────────────────────────────┤
+│     High-Level HAL Functions        │  ← sensor_init(), sensor_read_data()
+├─────────────────────────────────────┤
+│     Mid-Level HAL Functions         │  ← sensor_read_register(), sensor_write_register()
+├─────────────────────────────────────┤
+│     Low-Level SPI Functions         │  ← spi_transfer(), spi_read_byte()
+├─────────────────────────────────────┤
+│     Platform Layer                  │  ← Arduino SPI.h, Zephyr SPI API
+└─────────────────────────────────────┘
+                </pre>
+
+                <h3>Example HAL Function</h3>
+                <pre class="code-snippet">
+sensor_result_t sensor_init(void) {
+    // Complete initialization sequence
+    
+    // 1. Reset device
+    if (sensor_write_register(CMD_RESET, 0xFF) != SENSOR_OK) {
+        return SENSOR_ERROR;
+    }
+    platform_delay_ms(10);  // Wait for reset
+    
+    // 2. Check device ID
+    uint8_t device_id;
+    if (sensor_read_register(REG_DEVICE_ID, &device_id) != SENSOR_OK) {
+        return SENSOR_ERROR;
+    }
+    if (device_id != EXPECTED_DEVICE_ID) {
+        return SENSOR_ERROR;  // Wrong device!
+    }
+    
+    // 3. Configure device
+    if (sensor_write_register(REG_CONFIG, CONFIG_ENABLE | CONFIG_2G_RANGE) != SENSOR_OK) {
+        return SENSOR_ERROR;
+    }
+    
+    // 4. Enable data ready interrupt
+    if (sensor_write_register(REG_INTERRUPT, INT_DATA_READY_EN) != SENSOR_OK) {
+        return SENSOR_ERROR;
+    }
+    
+    return SENSOR_OK;
+}
+                </pre>
+            </div>
+        </section>
+
+        <section id="code" class="content-section">
+            <h2>[View Source Code]</h2>
+            <div class="terminal-box">
+                <p>Explore the actual implementation files:</p>
+                
+                <div class="file-list">
+                    <a href="code-viewer.html?file=spi_hal.h" class="file-link">[&gt;] spi_hal.h - Hardware Abstraction Layer Interface</a>
+                    <a href="code-viewer.html?file=spi_device_driver.h" class="file-link">[&gt;] spi_device_driver.h - Device Driver Interface</a>
+                    <a href="code-viewer.html?file=spi_device_driver.c" class="file-link">[&gt;] spi_device_driver.c - Device Driver Implementation</a>
+                    <a href="code-viewer.html?file=spi_hal_linux.c" class="file-link">[&gt;] spi_hal_linux.c - Linux Platform Implementation</a>
+                    <a href="code-viewer.html?file=registers.h" class="file-link">[&gt;] registers.h - Device Register Definitions</a>
+                    <a href="code-viewer.html?file=spi_data.txt" class="file-link">[&gt;] spi_data.txt - Sample SPI Transfer Data</a>
+                </div>
+            </div>
+        </section>
+
+        <section id="get-started" class="content-section">
+            <h2>[Let's Get Started]</h2>
+            <div class="terminal-box">
+                <p>With all this in mind, we have reached the point of diminishing returns in terms of what you can get out of trying to understand firmware development. What remains is to begin and take action. It is through trial by fire that real learning happens. The same applies to me and to anyone else; true growth comes through doing. Best of Luck.</p>
+                
+                <pre class="ascii-art">
+    _____                 _   _                _    _ 
+   / ____|               | | | |              | |  | |
+  | |  __  ___   ___   __| | | |    _   _  ___| | _| |
+  | | |_ |/ _ \ / _ \ / _` | | |   | | | |/ __| |/ / |
+  | |__| | (_) | (_) | (_| | | |___| |_| | (__|   <|_|
+   \_____|\___/ \___/ \__,_| |______\__,_|\___|_|\_(_)
+                </pre>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>Building Device Drivers From The Ground Up - A Guide to Embedded Systems Development</p>
+    </footer>
+</body>
+</html>
